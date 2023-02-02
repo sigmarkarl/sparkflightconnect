@@ -260,8 +260,8 @@ class SparkContext:
             self._conf.setIfMissing(key, value)
 
         # Check that we have at least the required parameters
-        if not self._conf.contains("spark.master"):
-            raise RuntimeError("A master URL must be set in your configuration")
+        #if not self._conf.contains("spark.master"):
+        #    raise RuntimeError("A master URL must be set in your configuration")
         if not self._conf.contains("spark.app.name"):
             raise RuntimeError("An application name must be set in your configuration")
 
@@ -399,7 +399,7 @@ class SparkContext:
         Initialize SparkContext in function to allow subclass specific initialization
         """
         assert self._jvm is not None
-        return self._jvm.JavaSparkContext(jconf)
+        return self._jvm.JavaSparkContext.fromSparkContext(self._jvm.org.apache.spark.SparkContext.getOrCreate(jconf))
 
     @classmethod
     def _ensure_initialized(
