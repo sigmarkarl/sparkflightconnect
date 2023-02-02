@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 
 public class SparkFlightConnect implements AutoCloseable {
     //10.71.73.177
-    final static Location          location = Location.forGrpcInsecure("10.71.73.177", 33333);
+    final static Location          location = Location.forGrpcInsecure("127.0.0.1", 33333);
     private      Py4JServer        py4jServer;
     private      RBackend          rBackend;
     private      SparkAppStreaming sparkAppStreaming;

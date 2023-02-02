@@ -34,11 +34,18 @@ public class SparkBatchConsumer implements VoidFunction2<Dataset<Row>, Long>, Au
         this.rport = rport;
     }
 
+    private void runWasm(String query) {
+        var df = sparkSession.sql(query);
+        df.toArrowBatchRdd().mapPartitions(null, false, null)
+        //var wasm = new Wasm();
+        //wasm.runWasm(query);
+    }
+
     private void runPython(String query) throws IOException, InterruptedException {
         Files.writeString(Path.of("cmd.py"), query);
         List<String> cmds          = new ArrayList<>();
         var          pysparkPython = System.getenv("PYSPARK_PYTHON");
-        cmds.add(pysparkPython != null ? pysparkPython : "python");
+        cmds.add(pysparkPython != null ? pysparkPython : "python3");
         cmds.add("cmd.py");
         System.err.println("blu " + String.join(",",cmds));
         ProcessBuilder      pb  = new ProcessBuilder(cmds);
@@ -95,7 +102,7 @@ public class SparkBatchConsumer implements VoidFunction2<Dataset<Row>, Long>, Au
 
             System.err.println("runnint type !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! " + type);
             if (type.equals("wasm")) {
-
+                runWasm(query);
             } else if (type.equals("python")) {
                 runPython(query);
             } else if(type.equals("R")) {
