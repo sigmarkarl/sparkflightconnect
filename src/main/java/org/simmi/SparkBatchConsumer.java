@@ -36,7 +36,8 @@ public class SparkBatchConsumer implements VoidFunction2<Dataset<Row>, Long>, Au
 
     private void runWasm(String query) {
         var df = sparkSession.sql(query);
-        df.toArrowBatchRdd().mapPartitions(null, false, null)
+        var cl = df.toArrowBatchRdd().toJavaRDD().mapPartitions(new WasmFunction()).collect();
+        System.err.println(String.join(",", cl));
         //var wasm = new Wasm();
         //wasm.runWasm(query);
     }
@@ -56,14 +57,12 @@ public class SparkBatchConsumer implements VoidFunction2<Dataset<Row>, Long>, Au
         env.put("PYSPARK_PIN_THREAD", "true");
 
         var pythonProcess = pb.start();
-
-        System.err.println("luuuuuuuuuuuuuiuiiuiuiuiuiuiuiuiuiuiuiuiuiuiuiuiuiuiuiiu!!!!!!!!");
+        
         es.submit(() -> pythonProcess.getErrorStream()
                                      .transferTo(System.out));
         es.submit(() -> pythonProcess.getInputStream()
                                      .transferTo(System.err));
 
-        System.err.println("luuuuuuuuuuuuuiuiiuiuiuiuiuiuiuiuiuiuiuiuiuiuiuiuiuiuiiu!!!!!!!!");
         pythonProcess.waitFor();
         System.err.println("unbeli");
     }
@@ -100,7 +99,6 @@ public class SparkBatchConsumer implements VoidFunction2<Dataset<Row>, Long>, Au
 
             sparkSession.sparkContext().setJobGroup("some group", type, false);
 
-            System.err.println("runnint type !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! " + type);
             if (type.equals("wasm")) {
                 runWasm(query);
             } else if (type.equals("python")) {
