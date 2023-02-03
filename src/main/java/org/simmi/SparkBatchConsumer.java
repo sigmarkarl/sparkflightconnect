@@ -48,7 +48,6 @@ public class SparkBatchConsumer implements VoidFunction2<Dataset<Row>, Long>, Au
         var          pysparkPython = System.getenv("PYSPARK_PYTHON");
         cmds.add(pysparkPython != null ? pysparkPython : "python3");
         cmds.add("cmd.py");
-        System.err.println("blu " + String.join(",",cmds));
         ProcessBuilder      pb  = new ProcessBuilder(cmds);
         Map<String, String> env = pb.environment();
 
@@ -57,14 +56,13 @@ public class SparkBatchConsumer implements VoidFunction2<Dataset<Row>, Long>, Au
         env.put("PYSPARK_PIN_THREAD", "true");
 
         var pythonProcess = pb.start();
-        
+
         es.submit(() -> pythonProcess.getErrorStream()
                                      .transferTo(System.out));
         es.submit(() -> pythonProcess.getInputStream()
                                      .transferTo(System.err));
 
         pythonProcess.waitFor();
-        System.err.println("unbeli");
     }
 
     private void runRscript(String query) throws IOException, InterruptedException {
