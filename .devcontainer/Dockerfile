@@ -11,8 +11,8 @@ RUN pip install pyspark
 
 RUN wget https://github.com/graalvm/graalvm-ce-dev-builds/releases/download/23.0.0-dev-20230203_2353/graalvm-ce-java19-linux-amd64-dev.tar.gz && \
     tar -xzf graalvm-ce-java19-linux-amd64-dev.tar.gz && \
-    rm graalvm-ce-java19-linux-amd64-dev.tar.gz && \
-    mv graalvm-ce-java19-23.0.0-dev /graalvm-ce-java19-23.0.0-dev
+    rm graalvm-ce-java19-linux-amd64-dev.tar.gz
+    #mv graalvm-ce-java19-23.0.0-dev /graalvm-ce-java19-23.0.0-dev
 
 ENV PATH="/graalvm-ce-java19-23.0.0-dev/bin:${PATH}"
 RUN gu install wasm
