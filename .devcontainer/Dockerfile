@@ -11,10 +11,10 @@ RUN gu install wasm
 #RUN gu install R
 RUN apt update && \
     apt install -y python3 python3-pip git
-#RUN pip install pyspark
-#COPY context.py /usr/local/lib/python3.10/dist-packages/pyspark/
+RUN pip install pyspark
+COPY context.py /usr/local/lib/python3.10/dist-packages/pyspark/
 
 #RUN source venv/bin/activate
 #RUN ./gradlew assemble
 
-WORKDIR /root
+#WORKDIR /root
