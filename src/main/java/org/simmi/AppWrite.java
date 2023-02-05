@@ -20,6 +20,7 @@ import java.io.Serializable;
 import java.util.Arrays;
 
 public class AppWrite implements Write, Serializable {
+    final String path = "letters";
 
     public BatchWrite toBatch() {
         Schema schema = new Schema(Arrays.asList(
