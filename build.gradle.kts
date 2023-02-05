@@ -22,8 +22,8 @@ repositories {
 
 dependencies {
     implementation("com.fasterxml.jackson:jackson-bom:2.14.1")
-    implementation("org.apache.arrow:flight-core:10.0.1")
-    implementation("org.apache.arrow:arrow-flight:10.0.1")
+    implementation("org.apache.arrow:flight-core:11.0.0")
+    implementation("org.apache.arrow:arrow-flight:11.0.0")
     implementation("org.apache.spark:spark-core_2.12:3.3.1")
     implementation("org.apache.spark:spark-sql_2.12:3.3.1")
 

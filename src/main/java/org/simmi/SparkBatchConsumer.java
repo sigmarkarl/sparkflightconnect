@@ -38,6 +38,7 @@ public class SparkBatchConsumer implements VoidFunction2<Dataset<Row>, Long>, Au
         var df = sparkSession.sql(query);
         var cl = df.toArrowBatchRdd().toJavaRDD().mapPartitions(new WasmFunction()).collect();
         System.err.println(String.join(",", cl));
+
         //var wasm = new Wasm();
         //wasm.runWasm(query);
     }
