@@ -17,7 +17,7 @@ RUN wget https://github.com/graalvm/graalvm-ce-dev-builds/releases/download/23.0
 ENV PATH="/graalvm-ce-java19-23.0.0-dev/bin:${PATH}"
 RUN gu install wasm
 
-COPY context.py /usr/local/lib/python3.10/dist-packages/pyspark/
+#COPY context.py /usr/local/lib/python3.10/dist-packages/pyspark/
 
 #RUN source venv/bin/activate
 #RUN ./gradlew assemble
