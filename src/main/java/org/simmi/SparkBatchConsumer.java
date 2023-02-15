@@ -1,10 +1,8 @@
 package org.simmi;
 
 import org.apache.spark.api.java.function.VoidFunction2;
+import org.apache.spark.sql.*;
 import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Row;
-import org.apache.spark.sql.SaveMode;
-import org.apache.spark.sql.SparkSession;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -32,6 +30,33 @@ public class SparkBatchConsumer implements VoidFunction2<Dataset<Row>, Long>, Au
         this.port = port;
         this.rsecret = rsecret;
         this.rport = rport;
+    }
+
+    public double runPrime() {
+        double count = 100000;
+        var df = sparkSession.range((int)count);
+        df = df.map(new RandomMapping(), df.encoder());
+        var bdf = df.map(new PrimeMapping(), Encoders.BOOLEAN());
+        var l = System.nanoTime();
+        var c = bdf.filter(new BooleanFilter()).count();
+        var t = System.nanoTime()-l;
+        System.err.println(t/1000000000.0);
+
+        return c / count;
+    }
+
+    public double runWasmPrime() {
+        double count = 100000;
+        var df = sparkSession.range((int)count);
+        df = df.map(new RandomMapping(), df.encoder());
+        var bdf = df.map(new WasmPrimeMapping(), Encoders.BOOLEAN());
+        //var bdf = df.mapPartitions(new WasmPartitionPrimeMapping(), Encoders.BOOLEAN());
+        var l = System.nanoTime();
+        var c = bdf.filter(new BooleanFilter()).count();
+        var t = System.nanoTime()-l;
+        System.err.println(t/1000000000.0);
+
+        return c / count;
     }
 
     private void runWasm(String query) {
@@ -130,5 +155,12 @@ public class SparkBatchConsumer implements VoidFunction2<Dataset<Row>, Long>, Au
     public void close() {
         sparkSession.close();
         es.shutdown();
+    }
+
+    public static void main(String[] args) {
+        var sparkSession = SparkSession.builder().master("local[*]").getOrCreate();
+        var sbc = new SparkBatchConsumer(sparkSession, "", 0, "", 0);
+        var primeRatio = sbc.runWasmPrime();
+        System.err.println(primeRatio);
     }
 }

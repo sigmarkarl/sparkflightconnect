@@ -11,6 +11,7 @@ import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.sql.execution.arrow.ArrowConverters;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
+import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.io.ByteSequence;
 
 import java.io.ByteArrayInputStream;
@@ -35,16 +36,38 @@ public class WasmFunction implements FlatMapFunction<Iterator<byte[]>, String> {
 
     public static void test() throws IOException {
         //var reader = new StringReader(c_code);
-        var path = Path.of("/Users/sigmar/Documents/GitHub/bundle.so");
+        //var path = Path.of("/Users/sigmar/Documents/GitHub/bundle.wasm");
+        var path = Path.of("/Users/sigmar/Documents/GitHub/polarust3/target/wasm32-wasi/release/polarust3.wasm");
         if (Files.exists(path) && Files.size(path) > 0) {
-            var sourcebuilder = Source.newBuilder("llvm", path.toFile());
+            var wasmBytes = Files.readAllBytes(path);
+            //var sourcebuilder = Source.newBuilder("wasm", path.toFile());
+            var sourcebuilder = Source.newBuilder("wasm", ByteSequence.create(wasmBytes), "test");
             var source = sourcebuilder.build();
-            try(Context polyglot = Context.newBuilder().
-                    allowAllAccess(true).build()) {
-                var val = polyglot.eval(source);
-                var res = val.invokeMember("test1", 10);
+            try(Context context = Context
+                    //.newBuilder()
+                    //.allowAllAccess(true)
+                    .newBuilder("wasm")
+                    .option("wasm.Builtins","wasi_snapshot_preview1")
+                    //.arguments("wasm",new String[] {"", "10"})
+                    .build()) {
+                //context.initialize("wasm");
+                var val = context.eval(source);
+                //var webAssembly = context.getPolyglotBindings().getMember("WebAssembly").as(WASMModule.class);
+                //var mainModule = webAssembly.module_decode(source);
+
+                // create java->WASM bindings and instantiate module
+                //Value memory = webAssembly.mem_alloc(108, 1000);
+                //Bindings bindings = new Bindings(memory, gameWindow::drawImage);
+                //var doomWASM = webAssembly.module_instantiate(mainModule, Value.asValue(bindings)).as(TestWasm.class);
+
+
+                var test1 = context.getBindings("wasm").getMember("main").getMember("_start");
+                var ten = test1.execute();
+                //var has = val.mem
+                //var res = val.execute();
+                //var res = val.invokeMember("w2c_test1", 10);
                 //var res = val2.execute(0, "simmi");
-                System.err.println(res);
+                System.err.println(ten);
             }
         } else {
             System.err.println("not exists");

@@ -14,8 +14,12 @@ import scala.Tuple2;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -40,10 +44,59 @@ public class SparkFlightConnect implements AutoCloseable {
         sparkAppStreaming = new SparkAppStreaming();
         initPy4JServer(sparkAppStreaming.getSparkSession());
         initRBackend();
+        startJupyterProcess();
         sparkAppStreaming.setPy4JServer(py4jServer);
         sparkAppStreaming.setRBackendSecret(rbackendSecret);
         sparkAppStreaming.setRBackendPort(rbackendPort);
         streamRes = executor.submit(sparkAppStreaming);
+    }
+
+    private static Optional<String> getJupyterBaseUrl() {
+        var baseurl = System.getenv("JUPYTER_BASE_URL");
+        if(baseurl==null) baseurl = System.getProperty("JUPYTER_BASE_URL");
+        if (baseurl!=null&&!baseurl.isEmpty()) {
+            return Optional.of(baseurl);
+        }
+        return Optional.empty();
+    }
+
+    private void startJupyterProcess() {
+        var plist = new ArrayList<>(
+                List.of("jupyter-lab", "--ip=0.0.0.0", "--NotebookApp.allow_origin='*'", "--port=8888", "--NotebookApp.port_retries=0", "--no-browser")); //, "--NotebookApp.token","''","--NotebookApp.disable_check_xsrf","True"));
+        var notebookdir = System.getenv("JUPYTER_NOTEBOOK_DIR");
+        if(notebookdir==null) notebookdir = System.getProperty("JUPYTER_NOTEBOOK_DIR");
+        if (notebookdir!=null&&!notebookdir.isEmpty()) {
+            plist.add("--notebook-dir="+notebookdir);
+        }
+        var baseurlOpt = getJupyterBaseUrl();
+        if (baseurlOpt.isPresent()) {
+            var baseurl = baseurlOpt.get();
+            plist.add("--NotebookApp.base_url=/"+baseurl);
+            plist.add("--LabApp.base_url=/"+baseurl);
+        }
+
+        var pyServerPort = Integer.toString(py4jServer.getListeningPort());
+        var pyServerSecret = py4jServer.secret();
+        System.err.println(pyServerPort+";"+pyServerSecret);
+
+        ProcessBuilder pb = new ProcessBuilder(plist);
+        pb.inheritIO();
+        //standaloneRoot.filter(p -> !p.startsWith("s3")).ifPresent(sroot -> pb.directory(Paths.get(sroot).toFile()));
+        Map<String,String> env = pb.environment();
+        env.put("PYSPARK_GATEWAY_PORT",pyServerPort);
+        env.put("PYSPARK_GATEWAY_SECRET",pyServerSecret);
+        env.put("PYSPARK_PIN_THREAD","true");
+        if (rbackendPort>0) {
+            env.put("SPARKR_WORKER_PORT",String.valueOf(rbackendPort));
+            env.put("SPARKR_WORKER_SECRET",rbackendSecret);
+            env.put("EXISTING_SPARKR_BACKEND_PORT",String.valueOf(rbackendPort));
+            env.put("SPARKR_BACKEND_AUTH_SECRET",rbackendSecret);
+        }
+        try {
+            pb.start();
+        } catch(IOException ie) {
+            ie.printStackTrace();
+        }
     }
 
     private void initPy4JServer(SparkSession spark) {
@@ -82,39 +135,56 @@ public class SparkFlightConnect implements AutoCloseable {
                 //flightClient.
                 // Get data information
                 var jsc = sparkFlightConnect.sparkAppStreaming.getJavaSparkContext();
-                try (FlightStream flightStream = flightClient.getStream(new Ticket(
-                        FlightDescriptor.path("profiles").getPath().get(0).getBytes(StandardCharsets.UTF_8)))) {
-                    int batch = 0;
-                    globalClient = flightClient;
-                    try (VectorSchemaRoot vectorSchemaRootReceived = flightStream.getRoot()) {
-                        System.err.println("C4: Client (Get Stream):");
-                        while (flightStream.next()) {
-                            batch++;
-                            System.err.println("Client Received batch #" + batch + ", Data:");
-                            var pythonCodeList = Collections.singletonList(vectorSchemaRootReceived.getFieldVectors().stream()
-                                                                                                   .map(i -> StandardCharsets.UTF_8.decode(i.getDataBuffer().nioBuffer()).toString())
-                                                                                                   .map(UTF8String::fromString)
-                                                                                                   .collect(
-                                                                                                           Collectors.toList()));
-                            var javaRDD = jsc.parallelize(pythonCodeList).map(s -> {
-                                //var utf8Str = UTF8String.fromString(s);
-                                var seq = JavaConverters.asScalaIteratorConverter(s.iterator()).asScala().toSeq();
-                                var oseq = (Seq<Object>)(Seq)seq;
-                                return InternalRow.apply(oseq);
-                            });
+                var running = true;
+                while (running) {
+                    try (FlightStream flightStream = flightClient.getStream(new Ticket(FlightDescriptor.path("profiles")
+                                                                                                       .getPath()
+                                                                                                       .get(0)
+                                                                                                       .getBytes(
+                                                                                                               StandardCharsets.UTF_8)))) {
+                        int batch = 0;
+                        globalClient = flightClient;
+                        try (VectorSchemaRoot vectorSchemaRootReceived = flightStream.getRoot()) {
+                            System.err.println("C4: Client (Get Stream):");
+                            while (flightStream.next()) {
+                                batch++;
+                                System.err.println("Client Received batch #" + batch + ", Data:");
+                                var pythonCodeList = Collections.singletonList(vectorSchemaRootReceived.getFieldVectors()
+                                                                                                       .stream()
+                                                                                                       .map(i -> StandardCharsets.UTF_8.decode(
+                                                                                                                                         i.getDataBuffer()
+                                                                                                                                          .nioBuffer())
+                                                                                                                                       .toString())
+                                                                                                       .map(UTF8String::fromString)
+                                                                                                       .collect(Collectors.toList()));
+                                var javaRDD = jsc.parallelize(pythonCodeList)
+                                                 .map(s -> {
+                                                     //var utf8Str = UTF8String.fromString(s);
+                                                     var seq = JavaConverters.asScalaIteratorConverter(s.iterator())
+                                                                             .asScala()
+                                                                             .toSeq();
+                                                     var oseq = (Seq<Object>) (Seq) seq;
+                                                     return InternalRow.apply(oseq);
+                                                 });
 
-                            var ds = sparkFlightConnect.sparkAppStreaming.getSparkSession().internalCreateDataFrame(javaRDD.rdd(), SparkAppStreamSource.SCHEMA, true);
-                            try {
-                                System.err.println("before queue");
-                                SparkFlightSource.queue.put(ds);
-                                System.err.println("after queue");
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
+                                var ds = sparkFlightConnect.sparkAppStreaming.getSparkSession()
+                                                                             .internalCreateDataFrame(javaRDD.rdd(),
+                                                                                                      SparkAppStreamSource.SCHEMA,
+                                                                                                      true);
+                                try {
+                                    System.err.println("before queue");
+                                    SparkFlightSource.queue.put(ds);
+                                    System.err.println("after queue");
+                                }
+                                catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
                             }
                         }
+                    } catch (Exception e) {
+                        Thread.sleep(60000);
+                        e.printStackTrace();
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();
                 }
 
                 // Get all metadata information
