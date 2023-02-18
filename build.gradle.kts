@@ -64,6 +64,7 @@ dependencies {
     implementation("org.apache.spark:spark-sql_2.12:3.3.1")
     implementation("org.apache.spark:spark-kubernetes_2.12:3.3.1")
     implementation("org.apache.spark:spark-hadoop-cloud_2.12:3.3.1")
+    implementation("org.jetbrains.kotlinx.spark:kotlin-spark-api_3.3.1_2.12:1.2.3")
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.1")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.8.1")
